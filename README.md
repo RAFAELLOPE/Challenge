@@ -1,2 +1,2 @@
 # Challenge
-Finantialforce challenge
+Financialforce challenge
