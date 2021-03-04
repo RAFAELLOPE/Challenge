@@ -8,12 +8,26 @@ class DatasetConsumption:
         self.df = dataset
 
     def get_transformed_dataset(self)->pd.DataFrame:
-        self.df(dropna=True)
-        df_t = pd.DataFrame()
+        df_t = self.df.copy()
+        df_t.dropna(inplace=True)
+        N = len(df_t)
+        #Create dummy columns to compute new statistics
+        df_t['average_outstanding'] = df_t.apply(lambda x: 1 if x['status'] == 'PENDING' else 0, axis=1)
+        df_t['total_completed'] = df_t.apply(lambda x: 1 if x['status'] == 'COMPLETED' else 0, axis=1)
+        df_t['critical_rate'] = df_t.apply(lambda x: 1 if x['status'] == 'FAILED' and x['amount'] > 1e6 else 0, axis=1)
+        df_t['error_rate'] = df_t.apply(lambda x: 1 if x['status'] == 'FAILED' and x['amount'] <= 1e6 else 0, axis=1)
+
+        group_col = ['country']
+        non_group_col = ['average_outstanding', 'total_completed', 'critical_rate', 'error_rate']
+
+        df_t = df_t.groupby(group_col, as_index=False)[non_group_col].agg(lambda x: sum([i for i in x]))
+        df_t['average_outstanding'] = df_t['average_outstanding'] / N
+        df_t['critical_rate'] = df_t['critical_rate'] / N 
+        df_t['error_rate'] = df_t['error_rate'] / N
+
+        return df_t
         
     
-
-
 
 def manage_arguments():
     parser = ArgumentParser()
@@ -70,14 +84,32 @@ if __name__ == "__main__":
     # with fields 'id', 'country', 'status', 'amount'.
     # The id is automatically created by the index of the dataframe
     df_test = pd.DataFrame({'country':country, 'status':status, 'amount':amount})
-    print(np.where(np.isnan(amount)))
-    print(df_test.head(10))
-    N = len(df_test)
-    df_test.dropna(inplace=True)
-    df = pd.DataFrame()
-    df = df_test.groupby('country', as_index=False, dropna=True)['status'].agg(lambda y: sum([1 if x == 'PENDING' else 0 for x in y])/N )
-    df_test.groupby('country', as_index=False, dropna=True)['status', 'amount'].agg(lambda y: [1 if x[] == ])
+    df_test.replace('nan', np.nan, inplace=True)
+    transformer = DatasetConsumption(df_test)
+    new_df = transformer.get_transformed_dataset()
+    #Checks
+    # Average outstanding = P(country)*P(pending)
+    # Average outstanding France FR = P(FR) * P(pending) = 0.1 * 0.2 = 0.02
+    # Average outstanding Spain SP = P(SP) * P(pending) = 0.1 * 0.2 = 0.02
+    # Average outstanding United Kingdom = P(UK) * P(pending) = 0.2 * 0.2 = 0.04
+    # Average outstanding United States = P(US) * P(pending) = 0.3 * 0.2 = 0.06
+    # Average outstanding Germany = P(GE) * P(pending) = 0.2 * 0.02 = 0.04
+    # Average outstanding The Netherlands = P(NL) * P(pending) = 0.09 * 0.2 = 0.018
+    # Assume numeric error of 0.005
+    epsilon = 0.005
+    assert abs(new_df[new_df['country'] == 'FR']['average_outstanding'] - 0.02) <= epsilon
+    assert abs(new_df[new_df['country'] == 'SP']['average_outstanding'] - 0.02) <= epsilon
+    assert abs(new_df[new_df['country'] == 'UK']['average_outstanding'] - 0.04) <= epsilon
+    assert abs(new_df[new_df['country'] == 'US']['average_outstanding'] - 0.06) <= epsilon
+    assert abs(new_df[new_df['country'] == 'GE']['average_outstanding'] - 0.04) <= epsilon
+    assert abs(new_df[new_df['country'] == 'NL']['average_outstanding'] - 0.018) <= epsilon
 
+    # Amounts has been generated from a normal distribution centered at 1M. 
+    # This distribution is symmetric, therefore 0.5 probability of getting an amount > 1M
+    # and 0.5 probability of getting an amount < 0.5.
+    # Critical rate = P(country) * P(amount > 1M) * P(failed)
+    # Error rate = P(country) * P(amount <= 1M) * P(failed)
+    
 
 
     
