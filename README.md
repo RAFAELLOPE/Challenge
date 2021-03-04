@@ -14,5 +14,6 @@ src (Core modules)
 tests (Test modules for unittest with pytest)
     test_data_consumption.py --> Contains method "test_data_consumption()" to statiscally test the transformed dataset
 
+Export PYTHONPATH to the app folder
 
 export PYTHONPATH="$PYTHONPATH:/path_to_challenge_app/challenge_app"
