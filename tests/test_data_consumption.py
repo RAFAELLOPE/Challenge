@@ -4,7 +4,10 @@ from src.challenge import DatasetConsumption
 import pandas as pd 
 import numpy as np 
 import scipy.stats
-import time
+
+
+
+
 
 def test_data_consumption():
     """
@@ -27,7 +30,7 @@ def test_data_consumption():
     FAIL                 ---> P=30%
 
     Probability distribution of the amount:
-    We generate a random sample of size 2000 from a Normal distribution with: 
+    We generate a random sample of size 10000 from a Normal distribution with: 
         MEAN = 1e6 
         STANDARD DEVIATION = 1e5
     """
@@ -51,17 +54,34 @@ def test_data_consumption():
     # We assume a call to DatasetAccess to retrieve data in a json (or dict)
     df_test = pd.DataFrame({'country':country, 'status':status, 'amount':amount})
     df_test.replace('nan', np.nan, inplace=True)
-
     # Create a DatasetConsumption object
     transformer = DatasetConsumption(df_test)
     # Get transformed dataframe and measure time
-    start_time = time.time()
     new_df = transformer.get_transformed_dataset()
-    print(f" --- time (seconds) -- {time.time() - start_time}")
+    
 
     #CHECKS
     ###############################################################################
-    # Average outstanding = P(country)*P(pending)
+    # ############### Total completed test ########################################
+    df_test.dropna(inplace=True)
+
+    completed_fr = len(df_test[(df_test['country'] == 'FR') & (df_test['status'] == 'COMPLETED')])
+    completed_sp = len(df_test[(df_test['country'] == 'SP') & (df_test['status'] == 'COMPLETED')])
+    completed_uk = len(df_test[(df_test['country'] == 'UK') & (df_test['status'] == 'COMPLETED')])
+    completed_us = len(df_test[(df_test['country'] == 'US') & (df_test['status'] == 'COMPLETED')])
+    completed_ge = len(df_test[(df_test['country'] == 'GE') & (df_test['status'] == 'COMPLETED')])
+    completed_nl = len(df_test[(df_test['country'] == 'NL') & (df_test['status'] == 'COMPLETED')])
+
+
+    assert new_df[new_df['country'] == 'FR']['total_completed'].values[0] == completed_fr
+    assert new_df[new_df['country'] == 'SP']['total_completed'].values[0] == completed_sp
+    assert new_df[new_df['country'] == 'UK']['total_completed'].values[0] == completed_uk
+    assert new_df[new_df['country'] == 'US']['total_completed'].values[0] == completed_us
+    assert new_df[new_df['country'] == 'GE']['total_completed'].values[0] == completed_ge
+    assert new_df[new_df['country'] == 'NL']['total_completed'].values[0] == completed_nl
+
+
+    # ############### Average outstanding = P(country)*P(pending) #################
 
     # Average outstanding France FR = P(FR) * P(pending) = 0.1 * 0.2 = 0.02
     # Average outstanding Spain SP = P(SP) * P(pending) = 0.1 * 0.2 = 0.02
@@ -70,7 +90,7 @@ def test_data_consumption():
     # Average outstanding Germany = P(GE) * P(pending) = 0.2 * 0.02 = 0.04
     # Average outstanding The Netherlands = P(NL) * P(pending) = 0.09 * 0.2 = 0.018
     # ** Assume numeric error of 0.005 for simplicyty but this should be carefully computed **
-    epsilon = 0.005
+    epsilon = 0.01
     assert abs(new_df[new_df['country'] == 'FR']['average_outstanding'].values[0] - 0.02) <= epsilon
     assert abs(new_df[new_df['country'] == 'SP']['average_outstanding'].values[0] - 0.02) <= epsilon
     assert abs(new_df[new_df['country'] == 'UK']['average_outstanding'].values[0] - 0.04) <= epsilon
@@ -78,6 +98,8 @@ def test_data_consumption():
     assert abs(new_df[new_df['country'] == 'GE']['average_outstanding'].values[0] - 0.04) <= epsilon
     assert abs(new_df[new_df['country'] == 'NL']['average_outstanding'].values[0] - 0.018) <= epsilon
 
+
+    # ######################### ERRRO RATES ##############################
     # Amounts has been generated from a normal distribution centered at 1M.
 
     # This distribution is symmetric, therefore 0.5 probability of getting an amount > 1M
@@ -170,3 +192,4 @@ def test_data_consumption():
     assert (error_rate_us <= 0.3*p_max_us*0.3 + epsilon) and (error_rate_us > 0.3*p_min_us*0.3 - epsilon), "Check error rate computed for US"
     assert (error_rate_ge <= 0.2*p_max_ge*0.3 + epsilon) and (error_rate_ge > 0.2*p_min_ge*0.3 - epsilon), "Check error rate computed for GE"
     assert (error_rate_nl <= 0.09*p_max_nl*0.3 + epsilon) and (error_rate_nl > 0.09*p_min_nl*0.3 - epsilon), "Check error rate computed for NL"
+
